@@ -33,7 +33,7 @@ class Animal:
                 break
 
     def show_animal(self):
-        return f"{self.tail} {self.body}  {self.noise}"
+        return f"{self.trail} {self.body}  {self.noise}"
     
     def on_shot(self):
         if random.random() < self.shoot_chance:
@@ -127,10 +127,11 @@ def send_animal(m):
 
         earliest_valid_reply = None
         earliest_valid_reply_time = None
-
-        for reply in replies:
-
-            # TODO: make sure it's not an already-failed reply or in the timeout
+reply['account']['id']
+            # make sure it's not an already-failed reply or in the timeout
+            if reply in failed_attempts: next
+            if reply['account']['id'] in user_timeouts:
+                if user_timeouts[reply['account']['id']] < datetime.now(): next
 
 
             reply_time = reply['created_at']

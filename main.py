@@ -127,7 +127,9 @@ def send_animal(m):
 
         earliest_valid_reply = None
         earliest_valid_reply_time = None
-reply['account']['id']
+
+        for reply in replies:
+
             # make sure it's not an already-failed reply or in the timeout
             if reply in failed_attempts: next
             if reply['account']['id'] in user_timeouts:

@@ -1,11 +1,17 @@
 from mastodon import Mastodon
 import random
-from datetime import datetime
+import datetime
 import time
 import re
+import logging
 
 SHOOT_REPLIES = ("bang", )
 BEFRIEND_REPLIES = ("befriend", "bef")
+
+SEND_INTERVAL_MIN_SECONDS = 30
+SEND_INTERVAL_MAX_SECONDS = 60
+
+CHECK_REPLY_INTERVAL_SECONDS = 10
 
 class Animal:
     
@@ -23,8 +29,8 @@ class Animal:
         self.befriend_chance = 0.9
         self.trail = "・゜゜・。。・゜゜"
 
-        self.shoot_fail_message = "You missed! It's like you weren't even trying. You can reload and shoot again in ten seconds."
-        self.befriend_fail_message = f"The {self.name} doesn't seem particularly friendly. You can get it a drink and try again in ten seconds."
+        self.shoot_fail_message = "You missed! It's like you weren't even trying. You can reload and shoot again in 1 minute."
+        self.befriend_fail_message = f"The {self.name} doesn't seem particularly friendly. You can get it a drink and try again in 1 minute."
 
         self.article = 'a'
         for letter in 'aeiouAEIOU':
@@ -42,7 +48,7 @@ class Animal:
             return self.shoot_fail_message, False
 
     def on_befriend(self):
-        if random.random() < self.shoot_chance:
+        if random.random() < self.befriend_chance:
             return f"You befriended {self.article} {self.name} and gained {self.points} points!", True
         else:
             return self.befriend_fail_message, False
@@ -55,7 +61,7 @@ class Duck(Animal):
             ("\_o<", "\_ö<", "\_ø<", "\_ó<"),
             ("QUACK!", "FLAP FLAP FLAP", "quack!", "quonk!")
         )
-        self.befriend_chance = 0.95
+        self.befriend_chance = 0
 
 
 class Goose(Animal):
@@ -115,56 +121,100 @@ def get_animal():
 
 def send_animal(m):
     chosen_animal = get_animal()
-    id = m.status_post(chosen_animal.show_animal())['id']  # post toot, and get its id
+    logging.debug(f"{chosen_animal.name} is the chosen animal")
+    
+    id = m.status_post(chosen_animal.show_animal())['id']  # API CALL - post toot, and get its id
+    logging.info(f"Sent {chosen_animal.name} successfully")
+
+    me = m.me()['acct']  # API CALL - we keep this to avoid excessive API calls
 
     failed_attempts = []  # list of Toots that already failed to shoot/befriend -- exclude them from checking
     user_timeouts = {}  # dict of users that have failed, and the time at which they'll be able to try again.
 
     # now we wait for a reply
     while True:
-        time.sleep(1)  # avoid rate limiting
-        replies = m.status_context(id)['descendants']
+        time.sleep(CHECK_REPLY_INTERVAL_SECONDS)  # avoid rate limiting
+        check_rate_limit(m)
+        replies = m.status_context(id)['descendants']  # API CALL
 
-        earliest_valid_reply = None
-        earliest_valid_reply_time = None
+        winning_reply = None
+        winning_reply_action = None
 
-        for reply in replies:
+        for this_reply in replies:
+            this_reply_content = re.sub('<[^<]+?>', '', this_reply['content']).lower().strip('!').strip('@duckhunter ')  # remove capitals, exclamations, HTML tags, and @duckhunter
+            this_reply_user = this_reply['account']['acct']
 
-            # make sure it's not an already-failed reply or in the timeout
-            if reply in failed_attempts: next
-            if reply['account']['id'] in user_timeouts:
-                if user_timeouts[reply['account']['id']] < datetime.now(): next
+            # make sure it's not a reply by ourselves
+            if this_reply_user == me:
+                logging.debug(f"ignored a reply from this account, {me}")
+                continue
 
+            # make sure it's not an already-failed reply
+            if this_reply['id'] in failed_attempts: 
+                logging.debug(f"an attempt by {this_reply_user} has already failed and will not be checked again")
+                continue
 
-            reply_time = reply['created_at']
-            reply_content = re.sub('<[^<]+?>', '', reply['content']).lower().strip('!')  # remove capitals and exclamations, as well as the HTML tags
-            
-            if reply_content in SHOOT_REPLIES:
-                action = 'shoot'
-            elif reply_content in BEFRIEND_REPLIES:
-                action = 'befriend'
+            # make sure user isn't timed out based on a previous failed reply
+            if this_reply_user in user_timeouts:
+                timeout_end = user_timeouts[this_reply_user]
+                if timeout_end > this_reply['created_at']:
+                    logging.debug(f"user {this_reply_user} is still in timeout and their latest reply has been discarded")
+                    failed_attempts.append(this_reply['id'])
+                    continue
+                else:
+                    logging.debug(f"user {this_reply_user} has left timeout and their latest reply is valid")
+
+            # determine action and remove non-action replies
+            if this_reply_content in SHOOT_REPLIES:
+                this_action = 'shoot'
+            elif this_reply_content in BEFRIEND_REPLIES:
+                this_action = 'befriend'
             else:
-                next
+                logging.debug(f"reply {this_reply_content} by {this_reply_user} was invalid and has been discarded")
+                failed_attempts.append(this_reply['id'])
+                continue
             
-            if earliest_valid_reply_time is None or reply_time < earliest_valid_reply_time:  # compare to existing choice to seee if it's sooner
-                earliest_valid_reply = reply
-                earliest_valid_reply_time = reply_time
+            # now we know it's valid, check it's the EARLIEST reply
+            if winning_reply is None or this_reply['created_at'] < winning_reply['created_at']:  # compare to existing choice to see if it's sooner
+                winning_reply = this_reply
+                winning_reply_action = this_action
         
-        if earliest_valid_reply:  # we have a valid reply! yay!
-            match action:
+        if winning_reply:  # we have a valid reply! yay!
+            logging.debug(f"valid reply found: {winning_reply_action} the {chosen_animal.name} by {winning_reply['account']['acct']}")
+            match winning_reply_action:
                 case 'shoot': 
                     response, action_success = chosen_animal.on_shot()
                 case 'befriend':
                     response, action_success = chosen_animal.on_befriend()
 
-            m.status_reply(earliest_valid_reply, response)  # post the response -- regardless of whether it succeeded or not
+            m.status_reply(winning_reply, response)  # API CALL - post the response -- regardless of whether it succeeded or not
 
             if action_success:
+                logging.info(f"action {winning_reply_action} {chosen_animal.name} by {winning_reply['account']['acct']} SUCCEEDED, they were awarded {chosen_animal.points} points")
                 break  # TODO: add points system
             else:  # they failed, so we need to prevent them from trying again on this animal for 10 seconds.
-                failed_attempts.append(earliest_valid_reply)
-                user_timeouts[earliest_valid_reply['account']['id']] = earliest_valid_reply['created_at'] + datetime.timedelta(seconds=10)
-      
+                logging.info(f"action {winning_reply_action} {chosen_animal.name} by {winning_reply['account']['acct']} FAILED")
+                failed_attempts.append(winning_reply['id'])
+                user_timeouts[winning_reply['account']['acct']] = winning_reply['created_at'] + datetime.timedelta(seconds=60)
 
-m = Mastodon(access_token="clientcred.secret", api_base_url="https://botsin.space")
-send_animal(m)
+
+def check_rate_limit(m):
+    logging.debug(f"rate limiting: {m.ratelimit_remaining} remaining of {m.ratelimit_limit}. reset at {m.ratelimit_reset}")
+
+def __main__():
+    logging.basicConfig(filename='duck-hunter.log', level=logging.DEBUG, filemode='w', format='%(asctime)s // %(levelname)s // %(message)s', )
+    logging.getLogger('urllib3.connectionpool').setLevel(logging.WARNING)  # this module creates logging spam
+    m = Mastodon(access_token="clientcred.secret")
+
+    logging.info("initialised")
+    check_rate_limit(m)
+
+    while True:
+        send_animal(m)
+        time.sleep(random.randint(SEND_INTERVAL_MIN_SECONDS, SEND_INTERVAL_MAX_SECONDS))
+
+if __name__ == '__main__':
+    try:
+        __main__()
+    except Exception as e:
+        logging.exception(e)

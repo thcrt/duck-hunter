@@ -13,8 +13,8 @@
 
         # all intervals measured in seconds
 
-        minimum = 30
-        maximum = 60
+        minimum = 900
+        maximum = 5400
 
 [api]
 

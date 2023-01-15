@@ -145,11 +145,12 @@ def get_animal():
     )[0]  # choices() returns a list of size k=1
 
 def send_animal(m, config):  # TODO: this long function is a code smell
+    logger = logging.getLogger(__name__)
     chosen_animal = get_animal()
-    logging.debug(f"{chosen_animal.name} is the chosen animal")
+    logger.debug(f"{chosen_animal.name} is the chosen animal")
 
     id = m.status_post(chosen_animal.show_animal())['id']
-    logging.info(f"Sent {chosen_animal.name} successfully")
+    logger.info(f"Sent {chosen_animal.name} successfully")
 
     me = m.me()['acct']
 
@@ -174,14 +175,14 @@ def send_animal(m, config):  # TODO: this long function is a code smell
 
             # make sure it's not an already-failed reply
             if this_reply['id'] in failed_attempts:
-                logging.debug(f"ignored a previously-failed attempt")
+                logger.debug(f"ignored a previously-failed attempt")
                 continue
 
             # make sure user isn't timed out based on a previous failed reply
             if this_reply['account']['acct'] in user_timeouts:
                 timeout_end = user_timeouts[this_reply['account']['acct']]
                 if timeout_end > this_reply['created_at']:
-                    logging.debug(
+                    logger.debug(
                         f"user {this_reply['account']['acct']} is still in "
                         f"timeout and their latest reply has been discarded")
                     failed_attempts.append(this_reply['id'])
@@ -207,7 +208,7 @@ def send_animal(m, config):  # TODO: this long function is a code smell
                 winning_reply_action = this_action
 
         if winning_reply:  # we have a valid reply! yay!
-            logging.debug(
+            logger.debug(
                 f"winning reply found: {winning_reply_action} the "
                 f"{chosen_animal.name} by {winning_reply['account']['acct']}")
             match winning_reply_action:
@@ -220,30 +221,37 @@ def send_animal(m, config):  # TODO: this long function is a code smell
             m.status_reply(winning_reply, response)
 
             if action_success:
-                logging.info(f"{winning_reply['account']['acct']} SUCCEEDED")
+                logger.info(f"{winning_reply['account']['acct']} SUCCEEDED")
                 break  # TODO: add points system
             else:  # they failed, so we need to prevent them from trying again on this animal for 10 seconds.
-                logging.info(f"{winning_reply['account']['acct']} FAILED")
+                logger.info(f"{winning_reply['account']['acct']} FAILED")
                 failed_attempts.append(winning_reply['id'])
                 user_timeouts[winning_reply['account']['acct']] = winning_reply['created_at'] + datetime.timedelta(seconds=60)
 
 
 def check_rate_limit(m):
-    logging.debug(
+    logging.getLogger(__name__).debug(
         f"rate limiting: {m.ratelimit_remaining} remaining of {m.ratelimit_limit}. "
         f"reset at {m.ratelimit_reset}")
 
 
 def __main__():
+    # config
     with open(CONF_FILE_PATH) as conf_file:
         config = toml.load(conf_file)
 
-    logging.basicConfig(filename='duck-hunter.log', level=logging.DEBUG, filemode='w',
-                        format='%(asctime)s // %(levelname)s // %(message)s')
+    # logging
+    logger = logging.getLogger(__name__)
+    logger.setLevel(config['logging']['level'])
+    logger_handler = logging.FileHandler(config['logging']['file'])
+    logger.addHandler(logger_handler)
+    logger_formatter = logging.Formatter(config['logging']['format'])
+    logger_handler.setFormatter(logger_formatter)
     logging.getLogger('urllib3.connectionpool').setLevel(logging.WARNING)  # this module creates logging spam
+
     m = Mastodon(access_token=config['api']['authentication']['secrets_path'])
 
-    logging.info("initialised")
+    logger.info("initialised")
     check_rate_limit(m)
 
     while True:
@@ -254,10 +262,10 @@ def __main__():
                 ))
             send_animal(m, config)
         except KeyboardInterrupt as e:
-            logging.info("recieved KeyboardInterrupt, goodbye!")
+            logger.info("recieved KeyboardInterrupt, goodbye!")
             break
         except Exception as e:
-            logging.exception(e)
+            logger.exception(e)
 
 
 if __name__ == '__main__':

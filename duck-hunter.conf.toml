@@ -27,3 +27,9 @@
     [api.authentication]
         
         secrets_path = "./clientcred.secret"
+
+[logging]
+    
+    level = "INFO"
+    file = "duck-hunter.log"
+    format = "%(asctime)s // %(levelname)s // %(message)s"

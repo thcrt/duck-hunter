@@ -76,7 +76,6 @@ class Duck(Animal):
             "duck",
             ("\_o<", "\_ö<", "\_ø<", "\_ó<"),
             ("QUACK!", "FLAP FLAP FLAP", "quack!", "quonk!"),
-            befriend_chance = 0
         )
 
 

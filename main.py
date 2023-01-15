@@ -133,16 +133,10 @@ class Alex(Animal):
 
 
 def get_animal():
-    i = random.randint(1, 1000) / 10  # get between 1 and 100 with .1 accuracy
-    if i <= 95:  # 95% chance
-        return Duck()
-    elif 95 < i <= 99.5:  # 3% chance
-        return Goose()
-    elif 99.5 < i <= 99.9:  # 0.4% chance
-        return Elephant()
-    else:  # 0.1% chance
-        return Alex()
-
+    return random.choices(
+        (Duck(), Goose(), Elephant(), Alex()),
+        weights=[100, 10, 5, 1]
+    )[0]  # choices() returns a list of size k=1
 
 def send_animal(m, config):  # TODO: this long function is a code smell
     chosen_animal = get_animal()

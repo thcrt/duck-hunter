@@ -1,0 +1,29 @@
+[gameplay]
+
+    [gameplay.replies]
+
+        shoot = [
+            "bang", 
+            ]
+        befriend = [
+            "befriend", "bef"
+            ]
+
+    [gameplay.send_intervals]
+
+        # all intervals measured in seconds
+
+        minimum = 30
+        maximum = 60
+
+[api]
+
+    [api.check_intervals]
+
+        # all intervals measured in seconds
+
+        replies = 10
+    
+    [api.authentication]
+        
+        secrets_path = "./clientcred.secret"

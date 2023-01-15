@@ -4,15 +4,17 @@ import datetime
 import time
 import re
 import logging
+import toml
 
+# SHOOT_REPLIES = ("bang", )
+# BEFRIEND_REPLIES = ("befriend", "bef")
 
-SHOOT_REPLIES = ("bang", )
-BEFRIEND_REPLIES = ("befriend", "bef")
+# SEND_INTERVAL_MIN_SECONDS = 30
+# SEND_INTERVAL_MAX_SECONDS = 60
 
-SEND_INTERVAL_MIN_SECONDS = 30
-SEND_INTERVAL_MAX_SECONDS = 60
+# CHECK_REPLY_INTERVAL_SECONDS = 10
 
-CHECK_REPLY_INTERVAL_SECONDS = 10
+CONF_FILE_PATH = "./duck-hunter.conf.toml"
 
 
 class Animal:
@@ -30,27 +32,40 @@ class Animal:
         self.befriend_chance = 0.9
         self.trail = "・゜゜・。。・゜゜"
 
-        self.shoot_fail_message = "You missed! It's like you weren't even trying. You can reload and shoot again in 1 minute."
-        self.befriend_fail_message = f"The {self.name} doesn't seem particularly friendly. You can get it a drink and try again in 1 minute."
-
         self.article = 'a'
         for letter in 'aeiouAEIOU':
             if name.startswith(letter):
                 self.article = 'an'
                 break
 
+        self.shoot_fail_message = (
+            "You missed! It's like you weren't even trying. "
+            "You can reload and shoot again in 1 minute.")
+        self.befriend_fail_message = (
+            f"The {self.name} doesn't seem particularly friendly. "
+            f"You can get it a drink and try again in 1 minute.")
+        
+        self.shoot_succeed_message = (
+            f"You shot {self.article} {self.name} "
+            f"and gained {self.points} points!")
+            
+        self.befriend_succeed_message = (
+            f"You befriended {self.article} {self.name} "
+            f"and gained {self.points} points!")
+
+
     def show_animal(self):
         return f"{self.trail} {self.body}  {self.noise}"
 
     def on_shot(self):
         if random.random() < self.shoot_chance:
-            return f"You shot {self.article} {self.name} and gained {self.points} points!", True
+            return self.shoot_succeed_message, True
         else:
             return self.shoot_fail_message, False
 
     def on_befriend(self):
         if random.random() < self.befriend_chance:
-            return f"You befriended {self.article} {self.name} and gained {self.points} points!", True
+            return self.befriend_succeed_message, True
         else:
             return self.befriend_fail_message, False
 
@@ -84,10 +99,16 @@ class Elephant(Animal):
             ("PVVVVT!", "STOMP STOMP STOMP", "pffft!", "phfnnn!"),
         )
         self.points = 10
-        self.befriend_fail_message = f"The {self.name} seems to have more important tasks at hand, and pays you little attention."
 
-    def on_shot(self):
-        return "Shooting such a wise and noble animal would be a wickedness. You lower your rifle in shame.", False
+        self.befriend_chance = 0.5
+        self.befriend_fail_message = (
+            f"The {self.name} seems to have more important tasks at hand, "
+            f"and pays you little attention.")
+
+        self.shoot_chance = 0
+        self.shoot_fail_message = (
+            "Shooting such a wise and noble animal would be a wickedness. "
+            "You lower your rifle in shame.")
 
 
 class Alex(Animal):
@@ -95,16 +116,26 @@ class Alex(Animal):
         super().__init__(
             "Alex",  # it's me!
             ("\o/",),
-            ("help! i'm trapped in a game!", "what am i doing here?",
-             "it's me, the dev! trans rights!", "it's me, the dev! free palestine!"),
+            (
+                "help! i'm trapped in a game!", 
+                "what am i doing here?",
+                "it's me, the dev! trans rights!", 
+                "it's me, the dev! free palestine!"
+            ),
         )
         self.points = 30
 
-    def on_shot(self):
-        return f"Really? You're shooting me? The developer of this game? Fine, take your {self.points} points and leave.", True
+        self.shoot_chance = 1
+        self.shoot_succeed_message = (
+            f"Really? You're shooting me? The developer of this game? "
+            f"Fine, take your {self.points} points and leave.")
 
-    def on_befriend(self):
-        return f"You want to be friends with... me? Some guy with nothing better to do than code a duck hunting game for Mastodon? Wow... thanks :) Here, take {self.points} points!", True
+        self.befriend_chance = 1
+        self.befriend_succeed_message = (
+            f"You want to be friends with... me? "
+            f"Some guy with nothing better to do than code a "
+            f"duck hunting game for Mastodon? Wow... thanks :) "
+            f"Here, take {self.points} points!")
 
 
 def get_animal():
@@ -119,7 +150,7 @@ def get_animal():
         return Alex()
 
 
-def send_animal(m):
+def send_animal(m, config):  # TODO: this long function is a code smell
     chosen_animal = get_animal()
     logging.debug(f"{chosen_animal.name} is the chosen animal")
 
@@ -128,12 +159,14 @@ def send_animal(m):
 
     me = m.me()['acct']
 
-    failed_attempts = []  # list of Toots that already failed to shoot/befriend -- exclude them from checking
-    user_timeouts = {}  # dict of users that have failed, and the time at which they'll be able to try again.
+    # list of Toots that already failed to shoot/befriend -- exclude them from checking
+    failed_attempts = []
+    # dict of users that have failed, and the time at which they'll be able to try again.
+    user_timeouts = {}
 
     # now we wait for a reply
     while True:
-        time.sleep(CHECK_REPLY_INTERVAL_SECONDS)  # avoid rate limiting
+        time.sleep(config['api']['check_intervals']['replies'])  # avoid rate limiting
         check_rate_limit(m)
         replies = m.status_context(id)['descendants']
 
@@ -141,37 +174,35 @@ def send_animal(m):
         winning_reply_action = None
 
         for this_reply in replies:
-            this_reply_content = re.sub('<[^<]+?>', '', this_reply['content']).lower().strip(
-                '!').strip('@duckhunter ')  # remove capitals, exclamations, HTML tags, and @duckhunter
-            this_reply_user = this_reply['account']['acct']
-
             # make sure it's not a reply by ourselves
-            if this_reply_user == me:
-                logging.debug(f"ignored a reply from this account, {me}")
+            if this_reply['account']['acct'] == me:
                 continue
 
             # make sure it's not an already-failed reply
             if this_reply['id'] in failed_attempts:
-                logging.debug(f"an attempt by {this_reply_user} has already failed and will not be checked again")
+                logging.debug(f"ignored a previously-failed attempt")
                 continue
 
             # make sure user isn't timed out based on a previous failed reply
-            if this_reply_user in user_timeouts:
-                timeout_end = user_timeouts[this_reply_user]
+            if this_reply['account']['acct'] in user_timeouts:
+                timeout_end = user_timeouts[this_reply['account']['acct']]
                 if timeout_end > this_reply['created_at']:
-                    logging.debug(f"user {this_reply_user} is still in timeout and their latest reply has been discarded")
+                    logging.debug(
+                        f"user {this_reply['account']['acct']} is still in "
+                        f"timeout and their latest reply has been discarded")
                     failed_attempts.append(this_reply['id'])
                     continue
-                else:
-                    logging.debug(f"user {this_reply_user} has left timeout and their latest reply is valid")
 
             # determine action and remove non-action replies
-            if this_reply_content in SHOOT_REPLIES:
+            this_reply_content = re.sub('<[^<]+?>', '', this_reply['content'])\
+                                 .lower()\
+                                 .strip('!')\
+                                 .strip('@duckhunter ')
+            if this_reply_content in config['gameplay']['replies']['shoot']:
                 this_action = 'shoot'
-            elif this_reply_content in BEFRIEND_REPLIES:
+            elif this_reply_content in config['gameplay']['replies']['befriend']:
                 this_action = 'befriend'
             else:
-                logging.debug(f"reply {this_reply_content} by {this_reply_user} was invalid and has been discarded")
                 failed_attempts.append(this_reply['id'])
                 continue
 
@@ -182,7 +213,9 @@ def send_animal(m):
                 winning_reply_action = this_action
 
         if winning_reply:  # we have a valid reply! yay!
-            logging.debug(f"valid reply found: {winning_reply_action} the {chosen_animal.name} by {winning_reply['account']['acct']}")
+            logging.debug(
+                f"winning reply found: {winning_reply_action} the "
+                f"{chosen_animal.name} by {winning_reply['account']['acct']}")
             match winning_reply_action:
                 case 'shoot':
                     response, action_success = chosen_animal.on_shot()
@@ -193,34 +226,42 @@ def send_animal(m):
             m.status_reply(winning_reply, response)
 
             if action_success:
-                logging.info(f"action {winning_reply_action} {chosen_animal.name} by {winning_reply['account']['acct']} SUCCEEDED, they were awarded {chosen_animal.points} points")
+                logging.info(f"{winning_reply['account']['acct']} SUCCEEDED")
                 break  # TODO: add points system
             else:  # they failed, so we need to prevent them from trying again on this animal for 10 seconds.
-                logging.info(f"action {winning_reply_action} {chosen_animal.name} by {winning_reply['account']['acct']} FAILED")
+                logging.info(f"{winning_reply['account']['acct']} FAILED")
                 failed_attempts.append(winning_reply['id'])
                 user_timeouts[winning_reply['account']['acct']] = winning_reply['created_at'] + datetime.timedelta(seconds=60)
 
 
 def check_rate_limit(m):
-    logging.debug(f"rate limiting: {m.ratelimit_remaining} remaining of {m.ratelimit_limit}. reset at {m.ratelimit_reset}")
+    logging.debug(
+        f"rate limiting: {m.ratelimit_remaining} remaining of {m.ratelimit_limit}. "
+        f"reset at {m.ratelimit_reset}")
 
 
 def __main__():
-    logging.basicConfig(filename='duck-hunter.log', level=logging.DEBUG, filemode='w', 
+    with open(CONF_FILE_PATH) as conf_file:
+        config = toml.load(conf_file)
+
+    logging.basicConfig(filename='duck-hunter.log', level=logging.DEBUG, filemode='w',
                         format='%(asctime)s // %(levelname)s // %(message)s')
     logging.getLogger('urllib3.connectionpool').setLevel(logging.WARNING)  # this module creates logging spam
-    m = Mastodon(access_token="clientcred.secret")
+    m = Mastodon(access_token=config['api']['authentication']['secrets_path'])
 
     logging.info("initialised")
     check_rate_limit(m)
 
     while True:
-        send_animal(m)
-        time.sleep(random.randint(SEND_INTERVAL_MIN_SECONDS, SEND_INTERVAL_MAX_SECONDS))
+        try:
+            time.sleep(random.randint(
+                config['gameplay']['send_intervals']['minimum'], 
+                config['gameplay']['send_intervals']['maximum']
+                ))
+            send_animal(m, config)
+        except Exception as e:
+            logging.exception(e)
 
 
 if __name__ == '__main__':
-    try:
-        __main__()
-    except Exception as e:
-        logging.exception(e)
+    __main__()

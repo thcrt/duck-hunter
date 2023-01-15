@@ -1,14 +1,15 @@
-from mastodon import Mastodon
 import random
 import datetime
 import time
 import re
 import logging
-import toml
 
+import toml
+from mastodon import Mastodon
 
 
 CONF_FILE_PATH = "./duck-hunter.conf.toml"
+
 
 
 class Animal:
@@ -68,6 +69,7 @@ class Animal:
             return self.befriend_fail_message, False
 
 
+
 class Duck(Animal):
     def __init__(self):
         super().__init__(
@@ -88,7 +90,6 @@ class Goose(Animal):
             befriend_chance=0.5
         )
         
-
 
 class Elephant(Animal):
     def __init__(self):
@@ -138,11 +139,14 @@ class Alex(Animal):
             f"Here, take {self.points} points!")
 
 
+
 def get_animal():
     return random.choices(
         (Duck(), Goose(), Elephant(), Alex()),
         weights=[100, 10, 5, 1]
     )[0]  # choices() returns a list of size k=1
+
+
 
 def send_animal(m, config):  # TODO: this long function is a code smell
     logger = logging.getLogger(__name__)
@@ -229,10 +233,12 @@ def send_animal(m, config):  # TODO: this long function is a code smell
                 user_timeouts[winning_reply['account']['acct']] = winning_reply['created_at'] + datetime.timedelta(seconds=60)
 
 
+
 def check_rate_limit(m):
     logging.getLogger(__name__).debug(
         f"rate limiting: {m.ratelimit_remaining} remaining of {m.ratelimit_limit}. "
         f"reset at {m.ratelimit_reset}")
+
 
 
 def __main__():
@@ -266,6 +272,7 @@ def __main__():
             break
         except Exception as e:
             logger.exception(e)
+
 
 
 if __name__ == '__main__':

@@ -121,8 +121,8 @@ class Alex(Animal):
                 "it's me, the dev! trans rights!", 
                 "it's me, the dev! free palestine!"
             ),
-            points = 30
-            shoot_chance = 1
+            points = 30,
+            shoot_chance = 1,
             befriend_chance = 1
         )
         self.points = 30
@@ -130,7 +130,7 @@ class Alex(Animal):
         self.shoot_succeed_message = (
             f"Really? You're shooting me? The developer of this game? "
             f"Fine, take your {self.points} points and leave.")
-            
+
         self.befriend_succeed_message = (
             f"You want to be friends with... me? "
             f"Some guy with nothing better to do than code a "

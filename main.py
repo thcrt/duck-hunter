@@ -16,15 +16,19 @@ class Animal:
             self,
             name,
             bodies,
-            noises):
+            noises,
+            points = 1,
+            shoot_chance = 0.9,
+            befriend_chance = 0.9,
+            trail="・゜゜・。。・゜゜"):
         self.name = name
         self.body = random.choice(bodies)
         self.noise = random.choice(noises)
 
-        self.points = 1
-        self.shoot_chance = 0.9
-        self.befriend_chance = 0.9
-        self.trail = "・゜゜・。。・゜゜"
+        self.points = points
+        self.shoot_chance = shoot_chance
+        self.befriend_chance = befriend_chance
+        self.trail = trail
 
         self.article = 'a'
         for letter in 'aeiouAEIOU':
@@ -69,9 +73,9 @@ class Duck(Animal):
         super().__init__(
             "duck",
             ("\_o<", "\_ö<", "\_ø<", "\_ó<"),
-            ("QUACK!", "FLAP FLAP FLAP", "quack!", "quonk!")
+            ("QUACK!", "FLAP FLAP FLAP", "quack!", "quonk!"),
+            befriend_chance = 0
         )
-        self.befriend_chance = 0
 
 
 class Goose(Animal):
@@ -80,9 +84,10 @@ class Goose(Animal):
             "goose",
             ("\_O<", "\_0< ", "\_Ö<", "\_Ø<", "\_Ó<"),
             ("HONK!", "FLAP FLOP FLIP", "honk!", "hjonk!"),
+            points=2,
+            befriend_chance=0.5
         )
-        self.points = 2
-        self.befriend_chance = 0.5
+        
 
 
 class Elephant(Animal):
@@ -90,16 +95,16 @@ class Elephant(Animal):
         super().__init__(
             "elephant",
             ("m°ᒑ°",),
-            ("PVVVVT!", "STOMP STOMP STOMP", "pffft!", "phfnnn!"),
+            ("PVVVVT!", "STOMP STOMP STOMP", "pffft!", "phfnnn!"), 
+            points = 10,
+            befriend_chance = 0.5,
+            shoot_chance = 0
         )
-        self.points = 10
-
-        self.befriend_chance = 0.5
+        
         self.befriend_fail_message = (
             f"The {self.name} seems to have more important tasks at hand, "
             f"and pays you little attention.")
 
-        self.shoot_chance = 0
         self.shoot_fail_message = (
             "Shooting such a wise and noble animal would be a wickedness. "
             "You lower your rifle in shame.")
@@ -116,15 +121,16 @@ class Alex(Animal):
                 "it's me, the dev! trans rights!", 
                 "it's me, the dev! free palestine!"
             ),
+            points = 30
+            shoot_chance = 1
+            befriend_chance = 1
         )
         self.points = 30
 
-        self.shoot_chance = 1
         self.shoot_succeed_message = (
             f"Really? You're shooting me? The developer of this game? "
             f"Fine, take your {self.points} points and leave.")
-
-        self.befriend_chance = 1
+            
         self.befriend_succeed_message = (
             f"You want to be friends with... me? "
             f"Some guy with nothing better to do than code a "

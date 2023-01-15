@@ -253,6 +253,9 @@ def __main__():
                 config['gameplay']['send_intervals']['maximum']
                 ))
             send_animal(m, config)
+        except KeyboardInterrupt as e:
+            logging.info("recieved KeyboardInterrupt, goodbye!")
+            break
         except Exception as e:
             logging.exception(e)
 

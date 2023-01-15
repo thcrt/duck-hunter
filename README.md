@@ -11,3 +11,18 @@ you really had to make your own fun back then.
 anyway, those of us who are chronically online can now be rewarded for having nothing better to do! just follow the bot [on its home instance](https://botsin.space/@duckhunter) and shoot/befriend any ducks you see. a leaderboard / stats tracking is coming Soon (tm).
 
 for any questions, send me a message at [@amshepherd@mstdn.social](https://mstdn.social/@amshepherd) :)
+
+## features
+- four different animals
+- a (small) chance that your rifle, or persuasive attempts, will fail
+- a 60-second timeout should the above happen
+- random ASCII art by hayley jane wakenshaw
+- low API calls (update ticks once every 10 seconds)
+- configurability
+
+## TODO
+- scorekeeping
+- leaderboard webpage
+- statistics
+- variable success rate based on previous scores (beginner's luck)
+- more animals

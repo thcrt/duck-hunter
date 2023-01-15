@@ -1,7 +1,5 @@
 [gameplay]
-
     [gameplay.replies]
-
         shoot = [
             "bang", 
             ]
@@ -10,26 +8,19 @@
             ]
 
     [gameplay.send_intervals]
-
         # all intervals measured in seconds
-
         minimum = 900
         maximum = 5400
 
 [api]
-
     [api.check_intervals]
-
         # all intervals measured in seconds
-
         replies = 10
     
     [api.authentication]
-        
         secrets_path = "./clientcred.secret"
 
 [logging]
-    
     level = "INFO"
     file = "duck-hunter.log"
     format = "%(asctime)s // %(levelname)s // %(message)s"

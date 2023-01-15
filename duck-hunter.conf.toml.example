@@ -9,8 +9,8 @@
 
     [gameplay.send_intervals]
         # all intervals measured in seconds
-        minimum = 900
-        maximum = 5400
+        minimum = 900 # 15 min
+        maximum = 5400 # 1hr 30min / 90min
 
 [api]
     [api.check_intervals]
@@ -21,6 +21,7 @@
         secrets_path = "./clientcred.secret"
 
 [logging]
+    # see docs on the python logging library
     level = "INFO"
     file = "duck-hunter.log"
     format = "%(asctime)s // %(levelname)s // %(message)s"

@@ -6,13 +6,7 @@ import re
 import logging
 import toml
 
-# SHOOT_REPLIES = ("bang", )
-# BEFRIEND_REPLIES = ("befriend", "bef")
 
-# SEND_INTERVAL_MIN_SECONDS = 30
-# SEND_INTERVAL_MAX_SECONDS = 60
-
-# CHECK_REPLY_INTERVAL_SECONDS = 10
 
 CONF_FILE_PATH = "./duck-hunter.conf.toml"
 
